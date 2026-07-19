@@ -1,175 +1,165 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
 import SendMoneyForm from "../components/SendMoneyForm";
-import TransactionTable from "../components/TransactionTable";
+import AddMoneyForm from "../components/AddMoneyForm";
 import Navbar from "../components/Navbar";
-import ProtectedRoute from "../components/ProtectedRoute";
 import UserQRCode from "../components/UserQRCode";
 import Footer from "../components/Footer";
 import BalanceCard from "../components/BalanceCard";
 import QuickActions from "../components/QuickActions";
 import ProfileCard from "../components/ProfileCard";
-
-
+import TransactionCard from "../components/TransactionCard";
 
 function Dashboard() {
+  const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState([]);
+  const [search, setSearch] = useState("");
+  const currentUserEmail = localStorage.getItem("userEmail");
 
-    const [balance, setBalance] = useState(0);
-    const [transactions,setTransactions] = useState([]);
-
-
-    const getBalance = async () => {
-
-        try {
-
-            const token =
-                localStorage.getItem("token");
-
-            const response =
-                await api.get(
-                    "/wallet/balance",
-                    {
-                        headers: {
-                            Authorization:
-                                `Bearer ${token}`
-                        }
-                    }
-                );
-
-            setBalance(
-                response.data.balance
-            );
-
-        } catch (error) {
-
-             alert(
-                error.response?.data?.message ||
-                "Something went wrong"
-             );
-
-        }
-
-    };
-
-
-     const getHistory = async () => {
-
+  const getBalance = async () => {
     try {
-
-        const token =
-            localStorage.getItem("token");
-
-        const response =
-            await api.get(
-                "/transaction/history",
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    }
-                }
-            );
-
-        setTransactions(
-            response.data
-        );
-
-    } catch (error) {
-
-        alert(
-             error.response?.data?.message ||
-             "Something went wrong"
-              );
-
+      const token = localStorage.getItem("token");
+      const res = await api.get("/wallet/balance", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setBalance(res.data.balance);
+    } catch (err) {
+      console.error(err);
     }
+  };
 
-};
+  const getHistory = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await api.get("/transaction/history", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTransactions(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-   const refreshDashboard = () => {
+  const refreshDashboard = () => {
+    getBalance();
+    getHistory();
+  };
 
-       getBalance();
+  useEffect(() => {
+    getBalance();
+    getHistory();
+  }, []);
 
-       getHistory();
+  // Compute totals
+  const totalSent = transactions
+    .filter((t) => t.sender?.email === currentUserEmail)
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalReceived = transactions
+    .filter((t) => t.receiver?.email === currentUserEmail)
+    .reduce((sum, t) => sum + t.amount, 0);
 
-    };
+  // Filter transactions by search
+  const filtered = transactions.filter((t) => {
+    const other = t.sender?.email === currentUserEmail ? t.receiver : t.sender;
+    return (
+      other?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      other?.email?.toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
-      useEffect(() => {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const userName = currentUserEmail?.split("@")[0] || "there";
 
-        getBalance();
-
-        getHistory();
-    }, []);
-
-   return (
-
+  return (
     <>
+      <Navbar />
+      <div style={styles.page}>
 
-        <Navbar />
+        {/* Greeting */}
+        <div style={styles.greeting}>
+          <h2 style={styles.greetText}>{greeting}, <span style={styles.greetName}>{userName}</span> 👋</h2>
+          <p style={styles.greetSub}>Here's your wallet overview</p>
+        </div>
 
-        <div className="container mt-4">
+        {/* Balance Card */}
+        <BalanceCard balance={balance} totalSent={totalSent} totalReceived={totalReceived} />
 
-            <div className="card p-4">
+        {/* Quick Actions */}
+        <QuickActions />
 
-                <h2>Dashboard</h2>
-           <h2 className="mb-4">
+        {/* QR Code */}
+        <div id="qr-section">
+          <UserQRCode />
+        </div>
 
-               Welcome 👋
+        {/* Add Money */}
+        <div id="add-money-section">
+          <AddMoneyForm refreshBalance={refreshDashboard} />
+        </div>
 
-            </h2>
-           <BalanceCard
-                  balance={balance}
-           />
+        {/* Send Money */}
+        <div id="send-money-section">
+          <SendMoneyForm refreshBalance={refreshDashboard} />
+        </div>
 
+        {/* Transaction History */}
+        <div id="history-section" style={styles.historyCard}>
+          <div style={styles.historyTop}>
+            <div>
+              <h3 style={styles.historyTitle}>Transaction History</h3>
+              <p style={styles.historySub}>{transactions.length} total transactions</p>
             </div>
-
-            <QuickActions />
-
-            <div id="qr-section">
-
-              <UserQRCode />
-
-            </div>
-
-            <div id="profile-section">
-
-              <ProfileCard />
-
-            </div>
-
-
-          <div id="send-money-section">
-
-           <SendMoneyForm
-              refreshBalance={refreshDashboard}
+            <input
+              style={styles.search}
+              type="text"
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
-
           </div>
 
-            <div id="history-section">
-
-         <TransactionTable
-             transactions={transactions}
-           />
-
-         </div>
-
+          {filtered.length === 0 ? (
+            <div style={styles.empty}>
+              <p style={styles.emptyText}>No transactions found</p>
+              <p style={styles.emptySub}>Your transaction history will appear here</p>
+            </div>
+          ) : (
+            filtered.map((t) => (
+              <TransactionCard
+                key={t._id}
+                transaction={t}
+                currentUserEmail={currentUserEmail}
+              />
+            ))
+          )}
         </div>
-        <>
-    
 
-    <div className="container mt-4">
+        {/* Profile */}
+        <div id="profile-section">
+          <ProfileCard />
+        </div>
 
-        {/* Dashboard Content */}
-
-    </div>
-
-    <Footer />
-
-</>
-
+      </div>
+      <Footer />
     </>
-
-);
+  );
 }
+
+const styles = {
+  page: { maxWidth: "780px", margin: "0 auto", padding: "24px 16px 48px" },
+  greeting: { marginBottom: "20px" },
+  greetText: { color: "#f1f5f9", fontSize: "22px", fontWeight: "700", margin: "0 0 4px" },
+  greetName: { color: "#3b82f6", textTransform: "capitalize" },
+  greetSub: { color: "#64748b", fontSize: "13px", margin: 0 },
+  historyCard: { background: "#1e293b", border: "1px solid #334155", borderRadius: "16px", padding: "24px", marginTop: "20px" },
+  historyTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", gap: "12px", flexWrap: "wrap" },
+  historyTitle: { color: "#f1f5f9", fontSize: "18px", fontWeight: "700", margin: "0 0 2px" },
+  historySub: { color: "#64748b", fontSize: "13px", margin: 0 },
+  search: { padding: "8px 14px", background: "#0f172a", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9", fontSize: "13px", outline: "none", minWidth: "220px" },
+  empty: { textAlign: "center", padding: "40px 0" },
+  emptyText: { color: "#f1f5f9", fontSize: "15px", fontWeight: "600", margin: "0 0 4px" },
+  emptySub: { color: "#64748b", fontSize: "13px", margin: 0 },
+};
 
 export default Dashboard;
