@@ -69,9 +69,7 @@ function Dashboard() {
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const displayName = userName?.charAt(0).toUpperCase() + userName?.slice(1).toLowerCase();
-  const userName = localStorage.getItem("userName") || 
-                 localStorage.getItem("userEmail")?.split("@")[0];
+  const userName = currentUserEmail?.split("@")[0] || "there";
 
   return (
     <>

@@ -18,7 +18,6 @@ function Login() {
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("role", response.data.role);
       localStorage.setItem("userEmail", response.data.email);
-      localStorage.setItem("userName", response.data.name);
       navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Invalid email or password");
