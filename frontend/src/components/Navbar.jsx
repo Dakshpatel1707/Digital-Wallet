@@ -7,7 +7,6 @@ function Navbar() {
   const [role, setRole] = useState("");
 
   useEffect(() => {
-    // Read role fresh every time Navbar mounts
     const storedRole = localStorage.getItem("role");
     setRole(storedRole || "");
   }, []);
